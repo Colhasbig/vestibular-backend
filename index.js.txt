@@ -1,0 +1,39 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import OpenAI from 'openai';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+await mongoose.connect('mongodb://127.0.0.1:27017/vestibular_app');
+
+const Cache = mongoose.model('Cache', {
+  hash: String,
+  tipo: String,
+  resultado: Object,
+  createdAt: { type: Date, default: Date.now, expires: 86400 }
+});
+
+const User = mongoose.model('User', {
+  erros: Object
+});
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
+
+function hash(texto) {
+  return crypto.createHash('md5').update(texto).digest('hex');
+}
+
+async function safeJSON(callFn, retries = 2) {
+  let lastError;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await callFn();
+      return JSON.parse(r.choices[0].message.content);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
